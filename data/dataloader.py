@@ -3,7 +3,7 @@ import numpy as np
 
 import torchvision.transforms as transforms
 import data.mytransforms as mytransforms
-from data.constant import tusimple_row_anchor, culane_row_anchor
+from data.constant import tusimple_row_anchor, culane_row_anchor, bdd100k_row_anchor
 from data.dataset import LaneClsDataset, LaneTestDataset
 
 def get_train_loader(batch_size, data_root, griding_num, dataset, use_aux, distributed, num_lanes):
@@ -44,6 +44,16 @@ def get_train_loader(batch_size, data_root, griding_num, dataset, use_aux, distr
                                            row_anchor = tusimple_row_anchor,
                                            segment_transform=segment_transform,use_aux=use_aux, num_lanes = num_lanes)
         cls_num_per_lane = 56
+
+    elif dataset == 'BDD100K':
+        train_dataset = LaneClsDataset(data_root,
+                                           os.path.join(data_root, 'lists/train_gt.txt'),
+                                           img_transform=img_transform, target_transform=target_transform,
+                                           simu_transform = simu_transform,
+                                           griding_num=griding_num, 
+                                           row_anchor = bdd100k_row_anchor,
+                                           segment_transform=segment_transform,use_aux=use_aux, num_lanes = num_lanes)
+        cls_num_per_lane = 56
     else:
         raise NotImplementedError
 
@@ -79,6 +89,13 @@ def get_test_loader(batch_size, data_root,dataset, distributed, crop_ratio, trai
             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
         test_dataset = LaneTestDataset(data_root,os.path.join(data_root, 'valid/valid_for_culane_style.txt'),img_transform = img_transforms, crop_size=train_height)
+    elif dataset == 'BDD100K':
+        img_transforms = transforms.Compose([
+            transforms.Resize((int(train_height / crop_ratio), train_width)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ])
+        test_dataset = LaneTestDataset(data_root,os.path.join(data_root, 'lists/val_gt.txt'),img_transform = img_transforms, crop_size=train_height)
     else:
         raise NotImplementedError
     if distributed:

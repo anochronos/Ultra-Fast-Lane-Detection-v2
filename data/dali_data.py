@@ -36,6 +36,8 @@ class LaneExternalIterator(object):
                 cache_path = os.path.join(path, 'tusimple_anno_cache.json')
             elif dataset_name == 'CurveLanes':
                 cache_path = os.path.join(path, 'train', 'curvelanes_anno_cache.json')
+            elif dataset_name == 'BDD100K':
+                cache_path = os.path.join(path, 'bdd100k_anno_cache.json')
             else:
                 raise NotImplementedError
 
@@ -139,8 +141,11 @@ def ExternalSourceTrainPipeline(batch_size, num_threads, device_id, external_dat
     pipe = Pipeline(batch_size, num_threads, device_id)
     with pipe:
         jpegs, seg_images, labels = fn.external_source(source=external_data, num_outputs=3)
-        images = fn.decoders.image(jpegs, device="mixed")
-        seg_images = fn.decoders.image(seg_images, device="mixed")
+        # Use CPU decoding for WSL2 compatibility, then transfer to GPU
+        images = fn.decoders.image(jpegs, device="cpu")
+        images = images.gpu()
+        seg_images = fn.decoders.image(seg_images, device="cpu")
+        seg_images = seg_images.gpu()
         if normalize_image_scale:
             images = fn.resize(images, resize_x=nscale_w, resize_y=nscale_h)
             seg_images = fn.resize(seg_images, resize_x=nscale_w, resize_y=nscale_h, interp_type=types.INTERP_NN)
@@ -181,7 +186,8 @@ def ExternalSourceValPipeline(batch_size, num_threads, device_id, external_data,
     pipe = Pipeline(batch_size, num_threads, device_id)
     with pipe:
         jpegs, labels = fn.external_source(source=external_data, num_outputs=2)
-        images = fn.decoders.image(jpegs, device="mixed")
+        images = fn.decoders.image(jpegs, device="cpu")
+        images = images.gpu()
         images = fn.resize(images, resize_x=train_width, resize_y=int(train_height/0.6)+1)
         images = fn.crop_mirror_normalize(images, 
                                             dtype=types.FLOAT, 
@@ -195,7 +201,8 @@ def ExternalSourceTestPipeline(batch_size, num_threads, device_id, external_data
     pipe = Pipeline(batch_size, num_threads, device_id)
     with pipe:
         jpegs, names = fn.external_source(source=external_data, num_outputs=2)
-        images = fn.decoders.image(jpegs, device="mixed")
+        images = fn.decoders.image(jpegs, device="cpu")
+        images = images.gpu()
 
         images = fn.resize(images, resize_x=800, resize_y=288)
         images = fn.crop_mirror_normalize(images, 
@@ -221,6 +228,9 @@ class TrainCollect:
         elif dataset_name == 'CurveLanes':
             self.original_image_width = 2560
             self.original_image_height = 1440
+        elif dataset_name == 'BDD100K':
+            self.original_image_width = 1280
+            self.original_image_height = 720
 
         if dataset_name == 'CurveLanes':
             pipe = ExternalSourceTrainPipeline(batch_size, num_threads, shard_id, eii, train_width, train_height,top_crop, normalize_image_scale = True, nscale_w = 2560, nscale_h = 1440)

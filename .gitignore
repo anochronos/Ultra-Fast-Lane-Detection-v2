@@ -9,4 +9,5 @@ evaluate
 **/build
 **/dist
 **/*egg-info
+**/bdd100k
 *.lprof

@@ -1,5 +1,4 @@
 import os, argparse
-from data.dali_data import TrainCollect
 from utils.dist_utils import get_rank, get_world_size, is_main_process, dist_print, DistSummaryWriter
 from utils.config import Config
 import torch
@@ -94,6 +93,9 @@ def merge_config():
     elif cfg.dataset == 'CurveLanes':
         cfg.row_anchor = np.linspace(0.4, 1, cfg.num_row)
         cfg.col_anchor = np.linspace(0, 1, cfg.num_col)
+    elif cfg.dataset == 'BDD100K':
+        cfg.row_anchor = np.linspace(160,710, cfg.num_row)/720  # Same as TuSimple (720p resolution)
+        cfg.col_anchor = np.linspace(0,1, cfg.num_col)
     
     return args, cfg
 
@@ -180,6 +182,7 @@ def get_model(cfg):
     return importlib.import_module('model.model_'+cfg.dataset.lower()).get_model(cfg)
 
 def get_train_loader(cfg):
+    from data.dali_data import TrainCollect
     if cfg.dataset == 'CULane':
         train_loader = TrainCollect(cfg.batch_size, 4, cfg.data_root, os.path.join(cfg.data_root, 'list/train_gt.txt'), get_rank(), get_world_size(), 
                                 cfg.row_anchor, cfg.col_anchor, cfg.train_width, cfg.train_height, cfg.num_cell_row, cfg.num_cell_col, cfg.dataset, cfg.crop_ratio)
@@ -190,6 +193,9 @@ def get_train_loader(cfg):
     elif cfg.dataset == 'CurveLanes':
         train_loader = TrainCollect(cfg.batch_size, 4, cfg.data_root, os.path.join(cfg.data_root, 'train', 'train_gt.txt'), get_rank(), get_world_size(), 
                                 cfg.row_anchor, cfg.col_anchor, cfg.train_width, cfg.train_height, cfg.num_cell_row, cfg.num_cell_col, cfg.dataset, cfg.crop_ratio)
+    elif cfg.dataset == 'BDD100K':
+        train_loader = TrainCollect(cfg.batch_size, 4, cfg.data_root, os.path.join(cfg.data_root, 'lists/train_gt.txt'), get_rank(), get_world_size(), 
+                                cfg.row_anchor, cfg.col_anchor, cfg.train_width, cfg.train_height, cfg.num_cell_row, cfg.num_cell_col, cfg.dataset, cfg.crop_ratio)
     else:
         raise NotImplementedError
     return train_loader 
@@ -197,7 +203,7 @@ def get_train_loader(cfg):
 def inference(net, data_label, dataset):
     if dataset == 'CurveLanes':
         return inference_curvelanes(net, data_label)
-    elif dataset in ['Tusimple', 'CULane']:
+    elif dataset in ['Tusimple', 'CULane', 'BDD100K']:
         return inference_culane_tusimple(net, data_label)
     else:
         raise NotImplementedError
